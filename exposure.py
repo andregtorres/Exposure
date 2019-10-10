@@ -42,7 +42,10 @@ def generateImage(inputFile, outputfile, n=0, verbose=False):
     sys.stdout.write('\r')
     j=0
     for i in range (n):
-        outputImage+=image
+        if rc:
+            outputImage+=image.astype(np.float64)
+        else:
+            print("W: missing frame at i={}".format(i))
         rc,image = vidcap.read()
         if (i+1) % int(n/20) == 0:
             j+=1
