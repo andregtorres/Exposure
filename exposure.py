@@ -7,9 +7,9 @@ import numpy as np
 import cv2
 import sys
 
-inputFile="Jozin_z_Bazin_polskie_napisy.mp4"
+#inputFile="Jozin_z_Bazin_polskie_napisy.mp4"
 
-def generateImage(inputFile, outputfile, n=0, verbose=False):
+def generateImage(inputFile, outputfile, n=0, mode= 0, verbose=False):
     try:
         vidcap = cv2.VideoCapture(inputFile)
     except Exception as e:
@@ -55,12 +55,35 @@ def generateImage(inputFile, outputfile, n=0, verbose=False):
     sys.stdout.write('\n')
 
     #normalize
+    #mode0
     x=outputImage/(np.max(outputImage))*255
-    outputImage=x.astype(np.uint8)
+    outputImage0=x.astype(np.uint8)
+
+    #mode1
+    maxs=np.array([0,0,0])
+    for a in outputImage:
+        for b in a:
+            for i in range(3):
+                if b[i]>maxs[i]:
+                    maxs[i]=b[i]
+    y =  outputImage/maxs*255
+    outputImage1=y.astype(np.uint8)
 
     #write output file
     try:
-        cv2.imwrite(outputfile, outputImage)
+        if mode==0:
+            cv2.imwrite(outputfile, outputImage0)
+        if mode==1:
+            cv2.imwrite(outputfile, outputImage1)
+        if mode==2:
+            ext=outputfile.split(".")[-1]
+            extlen=len(ext)
+            outName=outputfile[:-1*extlen -1]
+            outName0=outName+"_0."+ext
+            outName1=outName+"_1."+ext
+
+            cv2.imwrite(outName0, outputImage0)
+            cv2.imwrite(outName1, outputImage1)
     except:
         print("E: Error printing output file")
         return False
@@ -68,7 +91,7 @@ def generateImage(inputFile, outputfile, n=0, verbose=False):
     return True
 
 def printHelp(argv0):
-    print("Usage: python3" + argv0 + " inputFile.mp4 outputfile.png/.jpeg [Number of frames]")
+    print("Usage: python3" + argv0 + " inputFile.mp4 outputfile.png/.jpeg [mode]")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
@@ -77,7 +100,7 @@ if __name__ == "__main__":
         inputFile=sys.argv[1]
         outputFile=sys.argv[2]
         if len(sys.argv) > 3:
-            n=int(sys.argv[3])
+            mode=int(sys.argv[3])
         else:
-            n=0
-        generateImage(inputFile,outputFile,n,True)
+            mode=0
+        generateImage(inputFile,outputFile,0,mode,True)
