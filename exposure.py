@@ -1,20 +1,46 @@
 #Exposure
 #Andre Torres - 9.10.19
-#Creates a composite image from the frames of videoself.
+#Creates a composite image from the frames of videos.
 #Inspired by the work of Jason Shulman
 #https://www.publico.pt/2019/10/08/p3/fotogaleria/e-se-juntasses-todos-os-frames-de-um-filme-numa-so-imagem-397587?fbclid=IwAR0r5mGsVLrlsK5aNT-F_14q4zshxTwD6UKR2JmiVVtPcKGjoJmGJ5D9wME
 import numpy as np
 import cv2
+import subprocess
+import argparse
 import sys
 
 #inputFile="Jozin_z_Bazin_polskie_napisy.mp4"
 
-def generateImage(inputFile, outputfile, n=0, mode= 0, verbose=False):
+def generateImage(inputFile, outputfile, n=0, mode='absolute', trim=['0','-1'], verbose=False):
+    #trim video
+    delete=False
+    if trim != ['0','-1']:
+        delete=True
+        try:
+            subprocess.Popen("rm aux.mp4", shell=True, stdout=subprocess.PIPE)
+            t1=trim[0]
+            t2=trim[1]
+            args=""
+            if t1 != "0" and t1!="00:00:00":
+                args+=" -ss "+t1
+            if t1 != "-1":
+                args+=" -to "+t2
+            cmd="ffmpeg -i "+inputFile+args+" aux.mp4"
+            process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+            process.wait()
+            inputFile="aux.mp4"
+        except Exception as e:
+            print("E: Error trimming video "+inputFile)
+            return False
+
+
+    #GET VIDEO
     try:
         vidcap = cv2.VideoCapture(inputFile)
     except Exception as e:
         print("E: Error loading file "+inputFile)
         return False
+
 
     #count frames
     numberOfFrames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -55,11 +81,11 @@ def generateImage(inputFile, outputfile, n=0, mode= 0, verbose=False):
     sys.stdout.write('\n')
 
     #normalize
-    #mode0
+    #ABSOLUTE
     x=outputImage/(np.max(outputImage))*255
-    outputImage0=x.astype(np.uint8)
+    outputImage_abs=x.astype(np.uint8)
 
-    #mode1
+    #CHANNEL
     maxs=np.array([0,0,0])
     for a in outputImage:
         for b in a:
@@ -67,40 +93,49 @@ def generateImage(inputFile, outputfile, n=0, mode= 0, verbose=False):
                 if b[i]>maxs[i]:
                     maxs[i]=b[i]
     y =  outputImage/maxs*255
-    outputImage1=y.astype(np.uint8)
+    outputImage_ch=y.astype(np.uint8)
 
     #write output file
     try:
-        if mode==0:
-            cv2.imwrite(outputfile, outputImage0)
-        if mode==1:
-            cv2.imwrite(outputfile, outputImage1)
-        if mode==2:
+        if mode=='absolute':
+            cv2.imwrite(outputfile, outputImage_abs)
+        if mode=='channel':
+            cv2.imwrite(outputfile, outputImage_ch)
+        if mode=='both':
             ext=outputfile.split(".")[-1]
             extlen=len(ext)
             outName=outputfile[:-1*extlen -1]
-            outName0=outName+"_0."+ext
-            outName1=outName+"_1."+ext
+            outName_abs=outName+"_absolute."+ext
+            outName_ch=outName+"_channel."+ext
 
-            cv2.imwrite(outName0, outputImage0)
-            cv2.imwrite(outName1, outputImage1)
+            cv2.imwrite(outName_abs, outputImage_abs)
+            cv2.imwrite(outName_ch, outputImage_ch)
     except:
         print("E: Error printing output file")
         return False
 
+    #remove aux file
+    if delete:
+        subprocess.Popen("rm aux.mp4", shell=True, stdout=subprocess.PIPE)
     return True
 
-def printHelp(argv0):
-    print("Usage: python3" + argv0 + " inputFile.mp4 outputfile.png/.jpeg [mode]")
-
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        printHelp(sys.argv[0])
-    else:
-        inputFile=sys.argv[1]
-        outputFile=sys.argv[2]
-        if len(sys.argv) > 3:
-            mode=int(sys.argv[3])
-        else:
-            mode=0
-        generateImage(inputFile,outputFile,0,mode,True)
+    parser = argparse.ArgumentParser(description='Creates a composite image from the frames of videos.')
+    parser.add_argument('input', metavar='inputFile',
+                        help='Input file (.mp4 .mkv)')
+    parser.add_argument('output', metavar='outputFile',
+                        help='Output file (.png .jpg .jpeg)')
+    parser.add_argument('-n', '--norm', dest='norm', action='store', default='absolute', choices=['absolute', 'channel', 'both'], help='Normalization method.')
+    parser.add_argument('-t', '--trim', dest='times',  metavar=('t1','t2'), action='store', nargs=2, default=['0','-1'], help='Times for video trimming. Defaults to 0 -1')
+    parser.add_argument("-v", "--verbose", help="Verbosity", action="store_true")
+
+
+    #process parsed arguments
+    args = parser.parse_args()
+    inFile=args.input
+    outFile=args.output
+    mode=args.norm
+    verbose=args.verbose
+    times=args.times
+
+    generateImage(inFile,outFile,0,mode, times,verbose)
