@@ -3,6 +3,9 @@
 #Creates a composite image from the frames of videos.
 #Inspired by the work of Jason Shulman
 #https://www.publico.pt/2019/10/08/p3/fotogaleria/e-se-juntasses-todos-os-frames-de-um-filme-numa-so-imagem-397587?fbclid=IwAR0r5mGsVLrlsK5aNT-F_14q4zshxTwD6UKR2JmiVVtPcKGjoJmGJ5D9wME
+
+## TODO: anti AA filter for decimation
+
 import numpy as np
 import cv2
 import subprocess
@@ -11,7 +14,7 @@ import sys
 
 #inputFile="Jozin_z_Bazin_polskie_napisy.mp4"
 
-def generateImage(inputFile, outputfile, n=0, mode='absolute', trim=['0','-1'], verbose=False):
+def generateImage(inputFile, outputfile, n=0, mode='absolute', trim=['0','-1'], decimation=1, verbose=False):
     #trim video
     delete=False
     if trim != ['0','-1']:
@@ -65,15 +68,17 @@ def generateImage(inputFile, outputfile, n=0, mode='absolute', trim=['0','-1'], 
         print("Dimensions: {}x{}".format(height, width))
 
     #Sum images
-    sys.stdout.write('\r')
-    j=0
-    for i in range (n):
+    sys.stdout.write('\r')  #progress bar
+    j=0                     #progress bar
+    for i in range (0,n,decimation):
         if rc:
             outputImage+=image.astype(np.float64)
         else:
             print("W: missing frame at i={}".format(i))
+        vidcap.set(1,i)
         rc,image = vidcap.read()
-        if (i+1) % int(n/20) == 0:
+        #progress bar
+        if (i-1) >= int(n/20*(j+1)):
             j+=1
             sys.stdout.write("[%-20s] %d%%" % ('='*j, 5*j))
             sys.stdout.write('\r')
@@ -127,6 +132,7 @@ if __name__ == "__main__":
                         help='Output file (.png .jpg .jpeg)')
     parser.add_argument('-n', '--norm', dest='norm', action='store', default='absolute', choices=['absolute', 'channel', 'both'], help='Normalization method.')
     parser.add_argument('-t', '--trim', dest='times',  metavar=('t1','t2'), action='store', nargs=2, default=['0','-1'], help='Times for video trimming. Defaults to 0 -1')
+    parser.add_argument('-d', '--decimation', dest='decimation',  metavar=("d"), action='store', default='1', help='Use every d frame')
     parser.add_argument("-v", "--verbose", help="Verbosity", action="store_true")
 
 
@@ -137,5 +143,6 @@ if __name__ == "__main__":
     mode=args.norm
     verbose=args.verbose
     times=args.times
+    decimation=int(args.decimation)
 
-    generateImage(inFile,outFile,0,mode, times,verbose)
+    generateImage(inFile,outFile,0,mode, times,decimation, verbose)
